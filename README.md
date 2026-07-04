@@ -1,6 +1,8 @@
-# shene-timetotalk-contents-downloader
+# Time to Talk CD Audio Downloader
 
-`https://shane-timetotalk.jp/` のCDオーディオコンテンツを、認証済みアカウントで取得するための個人利用向けダウンロード補助ツールです。
+Shane English Schoolのオリジナルテキスト `Time to Talk` 向けCD Audioコンテンツを、認証済みアカウントで取得するための個人利用向けダウンロード補助ツールです。
+
+対象サイトは `https://shane-timetotalk.jp/` です。
 
 ログイン後の `uri` や `sid` は実行ごとに変わるため、URLを固定せず、画面上のリンク名をたどって対象コンテンツを探します。
 
@@ -9,10 +11,10 @@
 ## Features
 
 - `requests` を使ったログイン
-- コース一覧から `CD Audio` で始まるセクションを自動検出
-- セクション配下の `Audio` で始まる教材を漏れなく検出
-- 各教材のすべての `Track` をmp4としてダウンロード
-- Android向けに `.m4a` と `.m3u8` プレイリストを作成
+- Time to Talkのコース一覧から `CD Audio` で始まるセクションを自動検出
+- CD Audioセクション配下の `Audio` で始まる教材を漏れなく検出
+- Time to Talk教材ごとのすべての `Track` をmp4としてダウンロード
+- Android向けにTime to Talk教材単位の `.m4a` と `.m3u8` プレイリストを作成
 
 ## Requirements
 
@@ -56,7 +58,7 @@ password = "your-password"
 uv run python main.py --login-only
 ```
 
-CD Audioセクション配下にあるすべてのAudio教材の全Trackをダウンロードします。
+Time to TalkのCD Audioセクション配下にあるすべてのAudio教材の全Trackをダウンロードします。
 
 ```bash
 uv run python main.py
@@ -68,7 +70,7 @@ uv run python main.py
 downloads/<教材タイトル>/Track <番号>.mp4
 ```
 
-セクション名、教材名、保存先を変更したい場合は、`--section-prefix`、`--audio-prefix`、`--output-dir` を指定します。
+教材レベルや画面上の表記が異なる場合は、`--section-prefix`、`--audio-prefix`、`--output-dir` を指定します。
 
 ```bash
 uv run python main.py \
@@ -85,7 +87,7 @@ uv run python main.py --track 1
 
 ## Android Music
 
-Androidの音楽アプリで扱いやすい `.m4a` ファイルと `.m3u8` プレイリストを作成します。
+Time to Talkのダウンロード済み音声から、Androidの音楽アプリで扱いやすい `.m4a` ファイルと `.m3u8` プレイリストを作成します。
 
 ```bash
 uv run python scripts/create_android_playlists.py
@@ -126,7 +128,8 @@ uv run python scripts/create_android_playlists.py --no-convert
 ## Notes
 
 - このリポジトリには認証情報、Cookie、ダウンロード済みコンテンツを含めないでください。
-- このツールは、自分が正当にアクセスできる教材を個人利用の範囲で扱うための補助ツールです。
+- `Time to Talk` はShane English Schoolのオリジナルテキスト名です。
+- このツールは、自分が正当にアクセスできるTime to Talk教材を個人利用の範囲で扱うための補助ツールです。
 - サイトの利用規約、教材の著作権、所属組織やサービス提供者のルールに従って利用してください。
 - サイト側のHTMLやSCORM構造が変わると、リンク検出やダウンロード処理が動かなくなる可能性があります。
 - このツールは非公式であり、サービス提供者によるサポート対象ではありません。
