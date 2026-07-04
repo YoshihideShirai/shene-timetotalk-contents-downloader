@@ -27,4 +27,16 @@ password = "your-password"
 
 ## 実行
 
-現在は認証情報テンプレートの準備段階です。ダウンロード処理は今後 `main.py` に実装します。
+ログインできるか確認します。
+
+```bash
+uv run python main.py
+```
+
+認証ファイルの場所を変更したい場合は `--auth-file` を指定します。
+
+```bash
+uv run python main.py --auth-file config/auth.toml
+```
+
+成功すると `Login succeeded.` と表示されます。
