@@ -27,13 +27,13 @@ password = "your-password"
 
 ## 実行
 
-Audio Brown A の Track 1 をダウンロードします。
+CD Audio セクション配下にある Audio 教材の Track 1 をダウンロードします。
 
 ```bash
 uv run python main.py
 ```
 
-保存先は `downloads/Audio Brown A/Track 1.mp4` です。
+保存先は `downloads/<教材タイトル>/Track 1.mp4` です。
 
 ログインだけ確認したい場合は `--login-only` を指定します。
 
@@ -41,15 +41,15 @@ uv run python main.py
 uv run python main.py --login-only
 ```
 
-ログイン後のリンクは実行時に取得します。`uri` や `sid` は固定せず、リンク名で `CD Audio Brown`、`Audio Brown A`、`Track 1` の順にたどります。
+ログイン後のリンクは実行時に取得します。`uri` や `sid` は固定せず、コース一覧から `CD Audio` で始まるセクションを探し、その配下から `Audio` で始まる教材タイトル、`Track 1` の順にたどります。
 
-認証ファイルの場所、セクション名、音声教材名、トラック番号、保存先を変更したい場合は、それぞれ `--auth-file`、`--section-title`、`--audio-title`、`--track`、`--output-dir` を指定します。
+認証ファイルの場所、セクション名の前方一致、音声教材名の前方一致、トラック番号、保存先を変更したい場合は、それぞれ `--auth-file`、`--section-prefix`、`--audio-prefix`、`--track`、`--output-dir` を指定します。
 
 ```bash
 uv run python main.py \
   --auth-file config/auth.toml \
-  --section-title "CD Audio Brown" \
-  --audio-title "Audio Brown A" \
+  --section-prefix "CD Audio" \
+  --audio-prefix "Audio" \
   --track 1 \
   --output-dir downloads
 ```

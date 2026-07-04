@@ -15,8 +15,8 @@ import requests
 
 DEFAULT_AUTH_FILE = Path("config/auth.toml")
 DEFAULT_OUTPUT_DIR = Path("downloads")
-DEFAULT_SECTION_TITLE = "CD Audio Brown"
-DEFAULT_AUDIO_TITLE = "Audio Brown A"
+DEFAULT_SECTION_PREFIX = "CD Audio"
+DEFAULT_AUDIO_PREFIX = "Audio"
 LOGIN_PATH = "src/login.php"
 LOGIN_FAILURE_MARKERS = (
     "ログインできませんでした",
@@ -54,6 +54,12 @@ class LoginResult:
 @dataclass(frozen=True)
 class Link:
     href: str
+    text: str
+
+
+@dataclass(frozen=True)
+class ResolvedLink:
+    url: str
     text: str
 
 
@@ -165,44 +171,44 @@ def is_login_failure(response: requests.Response) -> bool:
 
 def download_track(
     login_result: LoginResult,
-    section_title: str,
-    audio_title: str,
+    section_prefix: str,
+    audio_prefix: str,
     track_number: int,
     output_dir: Path,
 ) -> Path:
     session = login_result.session
-    section_url = find_link_url(
+    section_link = find_link_by_prefix(
         html=login_result.landing_html,
         base_url=login_result.landing_url,
-        link_text=section_title,
+        link_prefix=section_prefix,
     )
-    section_response = session.get(section_url, timeout=30)
+    section_response = session.get(section_link.url, timeout=30)
     section_response.raise_for_status()
 
-    audio_url = find_link_url(
+    audio_link = find_link_by_prefix(
         html=section_response.text,
         base_url=section_response.url,
-        link_text=audio_title,
+        link_prefix=audio_prefix,
     )
-    track_url = find_track_url(session, audio_url, track_number)
+    track_url = find_track_url(session, audio_link.url, track_number)
     api_url = find_api_frame_url(session, track_url)
     content_url = find_content_url(session, api_url, track_url)
     source_url = find_mp4_source_url(session, content_url)
 
-    output_path = output_dir / safe_filename(audio_title) / f"Track {track_number}.mp4"
+    output_path = output_dir / safe_filename(audio_link.text) / f"Track {track_number}.mp4"
     download_file(session, source_url, output_path, referer=content_url)
     return output_path
 
 
-def find_link_url(html: str, base_url: str, link_text: str) -> str:
+def find_link_by_prefix(html: str, base_url: str, link_prefix: str) -> ResolvedLink:
     parser = ShaneHtmlParser()
     parser.feed(html)
 
     for link in parser.links:
-        if link.text == link_text:
-            return urljoin(base_url, link.href)
+        if link.text.startswith(link_prefix):
+            return ResolvedLink(url=urljoin(base_url, link.href), text=link.text)
 
-    raise DownloadError(f"{link_text} link was not found.")
+    raise DownloadError(f"Link starting with {link_prefix!r} was not found.")
 
 
 def find_track_url(
@@ -318,14 +324,14 @@ def parse_args() -> argparse.Namespace:
         help="Only check whether login succeeds.",
     )
     parser.add_argument(
-        "--section-title",
-        default=DEFAULT_SECTION_TITLE,
-        help=f"Section link text. Default: {DEFAULT_SECTION_TITLE}",
+        "--section-prefix",
+        default=DEFAULT_SECTION_PREFIX,
+        help=f"Section link prefix. Default: {DEFAULT_SECTION_PREFIX}",
     )
     parser.add_argument(
-        "--audio-title",
-        default=DEFAULT_AUDIO_TITLE,
-        help=f"Audio link text. Default: {DEFAULT_AUDIO_TITLE}",
+        "--audio-prefix",
+        default=DEFAULT_AUDIO_PREFIX,
+        help=f"Audio link prefix under the selected section. Default: {DEFAULT_AUDIO_PREFIX}",
     )
     parser.add_argument(
         "--track",
@@ -354,8 +360,8 @@ def main() -> int:
 
         output_path = download_track(
             login_result=login_result,
-            section_title=args.section_title,
-            audio_title=args.audio_title,
+            section_prefix=args.section_prefix,
+            audio_prefix=args.audio_prefix,
             track_number=args.track,
             output_dir=args.output_dir,
         )
