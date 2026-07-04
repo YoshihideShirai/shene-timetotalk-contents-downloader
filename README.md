@@ -23,7 +23,9 @@ Shane English Schoolのオリジナルテキスト `Time to Talk` 向けCD Audio
 - `ffmpeg`
   - Android向け `.m4a` 作成時のみ必要です。
   - mp4のままプレイリストだけ作る場合は不要です。
-  - 例: `brew install ffmpeg`、`sudo apt install ffmpeg`
+  - macOS: `brew install ffmpeg`
+  - Ubuntu/Debian: `sudo apt install ffmpeg`
+  - Windows: `winget install Gyan.FFmpeg`
 
 ## Setup
 
