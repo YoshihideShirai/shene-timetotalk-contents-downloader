@@ -27,16 +27,29 @@ password = "your-password"
 
 ## 実行
 
-ログインできるか確認します。
+Audio Brown A の Track 1 をダウンロードします。
 
 ```bash
 uv run python main.py
 ```
 
-認証ファイルの場所を変更したい場合は `--auth-file` を指定します。
+保存先は `downloads/Audio Brown A/Track 1.mp4` です。
+
+ログインだけ確認したい場合は `--login-only` を指定します。
 
 ```bash
-uv run python main.py --auth-file config/auth.toml
+uv run python main.py --login-only
 ```
 
-成功すると `Login succeeded.` と表示されます。
+ログイン後のリンクは実行時に取得します。`uri` や `sid` は固定せず、リンク名で `CD Audio Brown`、`Audio Brown A`、`Track 1` の順にたどります。
+
+認証ファイルの場所、セクション名、音声教材名、トラック番号、保存先を変更したい場合は、それぞれ `--auth-file`、`--section-title`、`--audio-title`、`--track`、`--output-dir` を指定します。
+
+```bash
+uv run python main.py \
+  --auth-file config/auth.toml \
+  --section-title "CD Audio Brown" \
+  --audio-title "Audio Brown A" \
+  --track 1 \
+  --output-dir downloads
+```
