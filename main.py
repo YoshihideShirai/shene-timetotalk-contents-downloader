@@ -63,6 +63,12 @@ class ResolvedLink:
     text: str
 
 
+@dataclass(frozen=True)
+class TrackLink:
+    number: int
+    url: str
+
+
 class ShaneHtmlParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -173,9 +179,9 @@ def download_track(
     login_result: LoginResult,
     section_prefix: str,
     audio_prefix: str,
-    track_number: int,
+    track_number: int | None,
     output_dir: Path,
-) -> Path:
+) -> list[Path]:
     session = login_result.session
     section_link = find_link_by_prefix(
         html=login_result.landing_html,
@@ -185,49 +191,78 @@ def download_track(
     section_response = session.get(section_link.url, timeout=30)
     section_response.raise_for_status()
 
-    audio_link = find_link_by_prefix(
+    audio_links = find_links_by_prefix(
         html=section_response.text,
         base_url=section_response.url,
         link_prefix=audio_prefix,
     )
-    track_url = find_track_url(session, audio_link.url, track_number)
-    api_url = find_api_frame_url(session, track_url)
-    content_url = find_content_url(session, api_url, track_url)
-    source_url = find_mp4_source_url(session, content_url)
 
-    output_path = output_dir / safe_filename(audio_link.text) / f"Track {track_number}.mp4"
-    download_file(session, source_url, output_path, referer=content_url)
-    return output_path
+    output_paths = []
+    for audio_link in audio_links:
+        tracks = find_track_links(session, audio_link.url)
+        if track_number is not None:
+            tracks = [track for track in tracks if track.number == track_number]
+            if not tracks:
+                raise DownloadError(f"Track {track_number} link was not found in {audio_link.text}.")
+
+        for track in tracks:
+            api_url = find_api_frame_url(session, track.url)
+            content_url = find_content_url(session, api_url, track.url)
+            source_url = find_mp4_source_url(session, content_url)
+            output_path = output_dir / safe_filename(audio_link.text) / f"Track {track.number}.mp4"
+            download_file(session, source_url, output_path, referer=content_url)
+            output_paths.append(output_path)
+
+    return output_paths
 
 
 def find_link_by_prefix(html: str, base_url: str, link_prefix: str) -> ResolvedLink:
+    links = find_links_by_prefix(html, base_url, link_prefix)
+    return links[0]
+
+
+def find_links_by_prefix(html: str, base_url: str, link_prefix: str) -> list[ResolvedLink]:
     parser = ShaneHtmlParser()
     parser.feed(html)
 
+    links = []
+    seen_texts = set()
     for link in parser.links:
-        if link.text.startswith(link_prefix):
-            return ResolvedLink(url=urljoin(base_url, link.href), text=link.text)
+        if link.text.startswith(link_prefix) and link.text not in seen_texts:
+            links.append(ResolvedLink(url=urljoin(base_url, link.href), text=link.text))
+            seen_texts.add(link.text)
 
-    raise DownloadError(f"Link starting with {link_prefix!r} was not found.")
+    if not links:
+        raise DownloadError(f"Link starting with {link_prefix!r} was not found.")
+
+    return links
 
 
-def find_track_url(
+def find_track_links(
     session: requests.Session,
     page_url: str,
-    track_number: int,
-) -> str:
+) -> list[TrackLink]:
     response = session.get(page_url, timeout=30)
     response.raise_for_status()
 
     parser = ShaneHtmlParser()
     parser.feed(response.text)
 
-    track_text = f"Track {track_number}"
+    tracks = []
     for link in parser.links:
-        if link.text == track_text:
-            return urljoin(response.url, link.href)
+        match = re.fullmatch(r"Track\s+(\d+)", link.text)
+        if match:
+            tracks.append(
+                TrackLink(
+                    number=int(match.group(1)),
+                    url=urljoin(response.url, link.href),
+                )
+            )
 
-    raise DownloadError(f"{track_text} link was not found.")
+    if not tracks:
+        raise DownloadError("Track links were not found.")
+
+    return sorted(tracks, key=lambda track: track.number)
 
 
 def find_api_frame_url(session: requests.Session, track_url: str) -> str:
@@ -287,6 +322,9 @@ def download_file(
     referer: str,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    if output_path.exists():
+        return
+
     temporary_path = output_path.with_suffix(output_path.suffix + ".part")
 
     with session.get(url, headers={"Referer": referer}, stream=True, timeout=60) as response:
@@ -336,8 +374,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--track",
         type=int,
-        default=1,
-        help="Track number to download. Default: 1.",
+        default=None,
+        help="Track number to download. Default: download all tracks.",
     )
     parser.add_argument(
         "--output-dir",
@@ -358,7 +396,7 @@ def main() -> int:
             print("Login succeeded.")
             return 0
 
-        output_path = download_track(
+        output_paths = download_track(
             login_result=login_result,
             section_prefix=args.section_prefix,
             audio_prefix=args.audio_prefix,
@@ -375,7 +413,9 @@ def main() -> int:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
-    print(f"Downloaded: {output_path}")
+    print(f"Downloaded {len(output_paths)} track(s).")
+    for output_path in output_paths:
+        print(f"- {output_path}")
     return 0
 
 
