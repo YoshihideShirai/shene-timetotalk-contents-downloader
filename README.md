@@ -29,7 +29,45 @@ Shane English Schoolのオリジナルテキスト `Time to Talk` 向けCD Audio
 
 ## Setup
 
-依存関係をインストールします。
+### uvを初めて使う場合
+
+`uv` はPythonのバージョン管理、仮想環境作成、依存関係インストール、コマンド実行をまとめて扱えるツールです。このリポジトリでは `uv run ...` で必要なPython環境を自動的に用意して実行します。
+
+まず、以下のいずれかの方法で `uv` をインストールしてください。最新の手順は [uv公式インストールガイド](https://docs.astral.sh/uv/getting-started/installation/) も確認してください。
+
+macOS / Linux:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Homebrewを使っている場合:
+
+```bash
+brew install uv
+```
+
+インストール後、ターミナルを開き直してから以下で確認します。
+
+```bash
+uv --version
+```
+
+このプロジェクトはPython 3.13以上が必要です。Python 3.13が未インストールの場合でも、通常は `uv sync` や `uv run ...` の実行時に `uv` が必要なPythonを自動で取得します。明示的に入れたい場合は以下を実行してください。
+
+```bash
+uv python install 3.13
+```
+
+### プロジェクトの依存関係をインストールする
+
+リポジトリ直下で依存関係をインストールします。
 
 ```bash
 uv sync
