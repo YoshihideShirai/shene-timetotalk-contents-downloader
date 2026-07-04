@@ -58,3 +58,24 @@ uv run python main.py \
 ```bash
 uv run python main.py --track 1
 ```
+
+## Android向けプレイリスト作成
+
+ダウンロード済みのmp4から、Androidの音楽アプリで読み込みやすい `.m3u8` プレイリストを作成します。
+
+```bash
+uv run python scripts/create_android_playlists.py
+```
+
+`downloads` 配下に以下のプレイリストが作成されます。
+
+- `downloads/All Tracks.m3u8`
+- `downloads/<教材タイトル>/<教材タイトル>.m3u8`
+
+`downloads` フォルダごとAndroid端末のMusicフォルダなどにコピーすると、対応している音楽アプリからプレイリストとして読み込めます。
+
+別のフォルダを対象にする場合は `--input-dir` を指定します。
+
+```bash
+uv run python scripts/create_android_playlists.py --input-dir downloads
+```
