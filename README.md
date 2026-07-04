@@ -59,23 +59,34 @@ uv run python main.py \
 uv run python main.py --track 1
 ```
 
-## Android向けプレイリスト作成
+## Android向け音楽ファイルとプレイリスト作成
 
-ダウンロード済みのmp4から、Androidの音楽アプリで読み込みやすい `.m3u8` プレイリストを作成します。
+ダウンロード済みのmp4から、Androidの音楽アプリで読み込みやすい `.m4a` と `.m3u8` プレイリストを作成します。
+
+この処理には `ffmpeg` が必要です。
 
 ```bash
 uv run python scripts/create_android_playlists.py
 ```
 
-`downloads` 配下に以下のプレイリストが作成されます。
+`android-music` 配下に以下が作成されます。
 
-- `downloads/All Tracks.m3u8`
-- `downloads/<教材タイトル>/<教材タイトル>.m3u8`
+- `android-music/All Tracks.m3u8`
+- `android-music/<教材タイトル>/Track <番号>.m4a`
+- `android-music/<教材タイトル>/<教材タイトル>.m3u8`
 
-`downloads` フォルダごとAndroid端末のMusicフォルダなどにコピーすると、対応している音楽アプリからプレイリストとして読み込めます。
+`android-music` フォルダごとAndroid端末のMusicフォルダなどにコピーすると、対応している音楽アプリから音声ファイルとプレイリストを読み込めます。
 
-別のフォルダを対象にする場合は `--input-dir` を指定します。
+別のフォルダを対象にする場合は `--input-dir`、出力先を変更する場合は `--audio-dir` を指定します。
 
 ```bash
-uv run python scripts/create_android_playlists.py --input-dir downloads
+uv run python scripts/create_android_playlists.py \
+  --input-dir downloads \
+  --audio-dir android-music
+```
+
+mp4のままプレイリストだけ作成したい場合は `--no-convert` を指定します。
+
+```bash
+uv run python scripts/create_android_playlists.py --no-convert
 ```

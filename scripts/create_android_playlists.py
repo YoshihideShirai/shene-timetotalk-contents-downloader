@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 
 DEFAULT_INPUT_DIR = Path("downloads")
+DEFAULT_AUDIO_DIR = Path("android-music")
 ALL_TRACKS_PLAYLIST = "All Tracks.m3u8"
 
 
@@ -17,6 +20,10 @@ class Track:
     number: int
 
 
+class FfmpegNotFoundError(RuntimeError):
+    pass
+
+
 def natural_track_number(path: Path) -> int:
     match = re.search(r"Track\s+(\d+)", path.stem)
     if match:
@@ -25,10 +32,10 @@ def natural_track_number(path: Path) -> int:
     return 10**9
 
 
-def find_album_tracks(input_dir: Path) -> dict[Path, list[Track]]:
+def find_album_tracks(input_dir: Path, suffix: str) -> dict[Path, list[Track]]:
     albums: dict[Path, list[Track]] = {}
 
-    for path in sorted(input_dir.glob("*/*.mp4")):
+    for path in sorted(input_dir.glob(f"*/*{suffix}")):
         if not path.is_file():
             continue
 
@@ -46,6 +53,46 @@ def find_album_tracks(input_dir: Path) -> dict[Path, list[Track]]:
     return dict(sorted(albums.items(), key=lambda item: item[0].name))
 
 
+def convert_mp4_to_m4a(input_dir: Path, audio_dir: Path) -> list[Path]:
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise FfmpegNotFoundError(
+            "ffmpeg is required to create Android music files. "
+            "Install ffmpeg and run this script again."
+        )
+
+    mp4_paths = sorted(input_dir.glob("*/*.mp4"))
+    if not mp4_paths:
+        raise FileNotFoundError(f"No mp4 files found under: {input_dir}")
+
+    output_paths = []
+    for mp4_path in mp4_paths:
+        relative_path = mp4_path.relative_to(input_dir).with_suffix(".m4a")
+        output_path = audio_dir / relative_path
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if output_path.exists() and output_path.stat().st_mtime >= mp4_path.stat().st_mtime:
+            output_paths.append(output_path)
+            continue
+
+        temporary_path = output_path.with_name(output_path.stem + ".part.m4a")
+        command = [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(mp4_path),
+            "-vn",
+            "-c:a",
+            "copy",
+            str(temporary_path),
+        ]
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        temporary_path.replace(output_path)
+        output_paths.append(output_path)
+
+    return output_paths
+
+
 def format_m3u_entry(track: Track, playlist_path: Path) -> str:
     relative_path = track.path.relative_to(playlist_path.parent).as_posix()
     return f"#EXTINF:-1,{track.title}\n{relative_path}\n"
@@ -57,13 +104,19 @@ def write_playlist(path: Path, tracks: list[Track]) -> None:
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
-def create_playlists(input_dir: Path) -> list[Path]:
+def create_playlists(input_dir: Path, audio_dir: Path, convert: bool) -> list[Path]:
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
 
-    albums = find_album_tracks(input_dir)
+    playlist_input_dir = audio_dir if convert else input_dir
+    suffix = ".m4a" if convert else ".mp4"
+
+    if convert:
+        convert_mp4_to_m4a(input_dir, audio_dir)
+
+    albums = find_album_tracks(playlist_input_dir, suffix)
     if not albums:
-        raise FileNotFoundError(f"No mp4 files found under: {input_dir}")
+        raise FileNotFoundError(f"No {suffix} files found under: {playlist_input_dir}")
 
     playlist_paths = []
     all_tracks = []
@@ -73,7 +126,7 @@ def create_playlists(input_dir: Path) -> list[Path]:
         playlist_paths.append(playlist_path)
         all_tracks.extend(tracks)
 
-    all_tracks_path = input_dir / ALL_TRACKS_PLAYLIST
+    all_tracks_path = playlist_input_dir / ALL_TRACKS_PLAYLIST
     write_playlist(all_tracks_path, all_tracks)
     playlist_paths.append(all_tracks_path)
 
@@ -90,6 +143,17 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_INPUT_DIR,
         help=f"Directory containing downloaded album folders. Default: {DEFAULT_INPUT_DIR}",
     )
+    parser.add_argument(
+        "--audio-dir",
+        type=Path,
+        default=DEFAULT_AUDIO_DIR,
+        help=f"Directory to write Android music files and playlists. Default: {DEFAULT_AUDIO_DIR}",
+    )
+    parser.add_argument(
+        "--no-convert",
+        action="store_true",
+        help="Skip mp4 to m4a conversion and create playlists for existing mp4 files.",
+    )
     return parser.parse_args()
 
 
@@ -97,8 +161,12 @@ def main() -> int:
     args = parse_args()
 
     try:
-        playlist_paths = create_playlists(args.input_dir)
-    except OSError as error:
+        playlist_paths = create_playlists(
+            input_dir=args.input_dir,
+            audio_dir=args.audio_dir,
+            convert=not args.no_convert,
+        )
+    except (FfmpegNotFoundError, OSError, subprocess.CalledProcessError) as error:
         print(f"Error: {error}")
         return 1
 
