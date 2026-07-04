@@ -23,6 +23,7 @@ htmlcov/
 # Local environment files
 .env
 .env.*
+config/auth.toml
 
 # Editor and OS noise
 .DS_Store

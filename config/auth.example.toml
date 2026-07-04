@@ -1,0 +1,7 @@
+# Copy this file to config/auth.toml and fill in your own credentials.
+# Never commit config/auth.toml.
+
+[shane_timetotalk]
+site_url = "https://shane-timetotalk.jp/"
+login_id = "your-login-id"
+password = "your-password"
