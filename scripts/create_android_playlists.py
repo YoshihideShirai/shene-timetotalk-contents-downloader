@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ from pathlib import Path
 DEFAULT_INPUT_DIR = Path("downloads")
 DEFAULT_AUDIO_DIR = Path("android-music")
 ALL_TRACKS_PLAYLIST = "All Tracks.m3u8"
+RIGHTS_HOLDER = "Shane English School"
 
 
 @dataclass(frozen=True)
@@ -25,11 +27,73 @@ class FfmpegNotFoundError(RuntimeError):
 
 
 def natural_track_number(path: Path) -> int:
-    match = re.search(r"Track\s+(\d+)", path.stem)
+    number = track_number_from_title(path.stem)
+    if number is not None:
+        return number
+
+    return 10**9
+
+
+def track_number_from_title(title: str) -> int | None:
+    match = re.search(r"Track\s+(\d+)", title)
     if match:
         return int(match.group(1))
 
-    return 10**9
+    return None
+
+
+def metadata_track_number(path: Path) -> int:
+    number = track_number_from_title(path.stem)
+    if number is None:
+        return 0
+
+    return number
+
+
+def read_m4a_metadata(ffprobe: str, path: Path) -> dict[str, str]:
+    command = [
+        ffprobe,
+        "-v",
+        "error",
+        "-show_entries",
+        "format_tags",
+        "-of",
+        "json",
+        str(path),
+    ]
+    result = subprocess.run(command, check=False, capture_output=True, text=True)
+    if result.returncode != 0:
+        return {}
+
+    try:
+        metadata = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {}
+
+    tags = metadata.get("format", {}).get("tags", {})
+    return {str(key).lower(): str(value) for key, value in tags.items()}
+
+
+def should_convert_m4a(
+    mp4_path: Path,
+    output_path: Path,
+    expected_metadata: dict[str, str],
+    ffprobe: str | None,
+) -> bool:
+    if not output_path.exists():
+        return True
+
+    if output_path.stat().st_mtime < mp4_path.stat().st_mtime:
+        return True
+
+    if ffprobe is None:
+        return True
+
+    current_metadata = read_m4a_metadata(ffprobe, output_path)
+    return any(
+        current_metadata.get(key.lower()) != value
+        for key, value in expected_metadata.items()
+    )
 
 
 def find_album_tracks(input_dir: Path, suffix: str) -> dict[Path, list[Track]]:
@@ -60,18 +124,32 @@ def convert_mp4_to_m4a(input_dir: Path, audio_dir: Path) -> list[Path]:
             "ffmpeg is required to create Android music files. "
             "Install ffmpeg and run this script again."
         )
+    ffprobe = shutil.which("ffprobe")
 
     mp4_paths = sorted(input_dir.glob("*/*.mp4"))
     if not mp4_paths:
         raise FileNotFoundError(f"No mp4 files found under: {input_dir}")
+
+    album_track_counts: dict[Path, int] = {}
+    for mp4_path in mp4_paths:
+        album_track_counts[mp4_path.parent] = album_track_counts.get(mp4_path.parent, 0) + 1
 
     output_paths = []
     for mp4_path in mp4_paths:
         relative_path = mp4_path.relative_to(input_dir).with_suffix(".m4a")
         output_path = audio_dir / relative_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        total_tracks = album_track_counts[mp4_path.parent]
+        expected_metadata = {
+            "title": mp4_path.stem,
+            "album": mp4_path.parent.name,
+            "artist": RIGHTS_HOLDER,
+            "album_artist": RIGHTS_HOLDER,
+            "copyright": RIGHTS_HOLDER,
+            "track": f"{metadata_track_number(mp4_path)}/{total_tracks}",
+        }
 
-        if output_path.exists() and output_path.stat().st_mtime >= mp4_path.stat().st_mtime:
+        if not should_convert_m4a(mp4_path, output_path, expected_metadata, ffprobe):
             output_paths.append(output_path)
             continue
 
@@ -84,6 +162,18 @@ def convert_mp4_to_m4a(input_dir: Path, audio_dir: Path) -> list[Path]:
             "-vn",
             "-c:a",
             "copy",
+            "-metadata",
+            f"title={expected_metadata['title']}",
+            "-metadata",
+            f"album={expected_metadata['album']}",
+            "-metadata",
+            f"artist={expected_metadata['artist']}",
+            "-metadata",
+            f"album_artist={expected_metadata['album_artist']}",
+            "-metadata",
+            f"copyright={expected_metadata['copyright']}",
+            "-metadata",
+            f"track={expected_metadata['track']}",
             str(temporary_path),
         ]
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
