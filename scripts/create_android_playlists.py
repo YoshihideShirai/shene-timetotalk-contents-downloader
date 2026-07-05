@@ -13,6 +13,7 @@ DEFAULT_INPUT_DIR = Path("downloads")
 DEFAULT_AUDIO_DIR = Path("android-music")
 ALL_TRACKS_PLAYLIST = "All Tracks.m3u8"
 RIGHTS_HOLDER = "Shane English School"
+ALBUM_TITLE_PREFIX = "Time to Talk"
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,13 @@ def metadata_track_number(path: Path) -> int:
         return 0
 
     return number
+
+
+def album_title(album_dir_name: str) -> str:
+    if album_dir_name.startswith(ALBUM_TITLE_PREFIX):
+        return album_dir_name
+
+    return f"{ALBUM_TITLE_PREFIX} {album_dir_name}"
 
 
 def read_m4a_metadata(ffprobe: str, path: Path) -> dict[str, str]:
@@ -142,7 +150,7 @@ def convert_mp4_to_m4a(input_dir: Path, audio_dir: Path) -> list[Path]:
         total_tracks = album_track_counts[mp4_path.parent]
         expected_metadata = {
             "title": mp4_path.stem,
-            "album": mp4_path.parent.name,
+            "album": album_title(mp4_path.parent.name),
             "artist": RIGHTS_HOLDER,
             "album_artist": RIGHTS_HOLDER,
             "copyright": RIGHTS_HOLDER,
